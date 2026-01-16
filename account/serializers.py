@@ -29,6 +29,26 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**validated_data)
 
 
+class UserVerificationEmailSerializer(serializers.Serializer):
+    def validate(self, attrs):
+        uid = self.context.get('uid')
+        token = self.context.get('token')
+        try:
+            user_id = smart_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(id=user_id)
+        except (User.DoesNotExist, ValueError, TypeError):
+            raise serializers.ValidationError("Invalid verification link.")
+        
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            raise serializers.ValidationError("Token is invalid or expired.")
+        
+        if user.is_active:
+            raise serializers.ValidationError("User is already active.")
+        
+        user.is_active = True
+        user.save()
+        return attrs
+
 class UserLoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=255)
     class Meta:

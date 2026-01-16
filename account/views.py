@@ -1,11 +1,12 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer, UserChangePasswordserializer,  SendPasswordResetEmailSerializer, UserPasswordResetSerializer
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer, UserChangePasswordserializer,  SendPasswordResetEmailSerializer, UserPasswordResetSerializer, UserVerificationEmailSerializer
 from django.contrib.auth import authenticate
 from .renderers import UserRender
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
+from .utils import Util
 
 
 def get_tokens_for_user(user):
@@ -23,10 +24,19 @@ class UserRegistrationView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.save()
-            #Send Email
             token = get_tokens_for_user(user)
-            return Response({"token": token, "msg": "Registration success"}, status=status.HTTP_201_CREATED)
+            #Send Email
+            Util.send_verification_email(request, user)
+            return Response({"token": token, "msg": "Registration success! Please check your email."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserVerificationEmailView(APIView):
+    renderer_classes = [UserRender]
+    def get(self, request, uid, token, format=None):
+        serializer = UserVerificationEmailSerializer(data={}, context={'uid':uid, 'token':token})
+        serializer.is_valid(raise_exception=True)
+        return Response({"msg": "Your Account is activated!"}, status=status.HTTP_200_OK)
 
 
 class UserLoginView(APIView):
